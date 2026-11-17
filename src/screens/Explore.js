@@ -3,7 +3,7 @@ import { FlatList, Image, PanResponder, Pressable, ScrollView, StyleSheet, TextI
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { Mark, PhotoTile } from '../components';
 import { CATEGORIES, colorAt, shade, FULL_RANGE, MAX_YEAR, MIN_YEAR, results, searchIsRelated, spectrumImage } from '../library';
-import { COLORS, FONTS, s, T, useFit } from '../theme';
+import { COLORS, FONTS, GRID_GAP, GRID_GUTTER, s, T, TILE, useFit } from '../theme';
 
 const BATCH = 14;
 const PICKER_WIDTH = 302;
@@ -280,7 +280,7 @@ export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, 
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.gridContent}
         initialNumToRender={8}
-        renderItem={({ item }) => <PhotoTile photo={item} height={168} onPress={onOpenPhoto} />}
+        renderItem={({ item }) => <PhotoTile photo={item} height={TILE} onPress={onOpenPhoto} />}
         onEndReached={() => setCount((c) => Math.min(c + BATCH, shown.length))}
         onEndReachedThreshold={1.2}
         ListHeaderComponent={related && shown.length ? <T style={styles.related}>No exact matches for “{deferred.q.trim()}”. Showing related images.</T> : null}
@@ -334,8 +334,8 @@ export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, 
 const styles = StyleSheet.create({
   root: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: COLORS.ink },
   list: { position: 'absolute', left: 0, right: 0, top: s(217), bottom: 0 },
-  row: { gap: s(17), marginBottom: s(11) },
-  gridContent: { paddingHorizontal: s(21), paddingBottom: s(130) },
+  row: { gap: s(GRID_GAP), marginBottom: s(GRID_GAP) },
+  gridContent: { paddingHorizontal: s(GRID_GUTTER), paddingBottom: s(130) },
   empty: { paddingVertical: s(90), paddingHorizontal: s(24), textAlign: 'center', fontSize: s(19), lineHeight: s(26) },
   related: { fontSize: s(15), color: COLORS.muted, paddingBottom: s(10) },
   more: { textAlign: 'center', fontSize: s(15), color: COLORS.muted, paddingTop: s(8) },

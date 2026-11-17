@@ -23,6 +23,10 @@ export const FONTS = {
 
 // The Figma frames are 393pt wide; everything scales from that width.
 const FIGMA_WIDTH = 393;
+// Photo grids: narrow side margins and gaps, so photos sit close to the screen edges.
+export const GRID_GUTTER = 8; // left and right edge
+export const GRID_GAP = 8; // between columns and rows
+export const TILE = (FIGMA_WIDTH - 2 * GRID_GUTTER - GRID_GAP) / 2; // one column's width
 const FIGMA_HEIGHT = 852;
 // In a desktop browser the app keeps phone width, centered (see source/build_web.py).
 export const WEB_MAX_WIDTH = 430;

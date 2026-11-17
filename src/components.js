@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { MARK_OVER, MARK_UNDER } from './data/icons';
 import { imageFor } from './library';
-import { COLORS, s, T, useFit } from './theme';
+import { COLORS, GRID_GAP, GRID_GUTTER, s, T, TILE, useFit } from './theme';
 
 function Gradients() {
   return (
@@ -56,7 +56,8 @@ export function PhotoTile({ photo, height, onPress }) {
   );
 }
 
-const HEIGHTS = [[220, 160, 240], [150, 250, 200]];
+// Masonry heights from the Figma frames (drawn for 168pt-wide tiles), scaled to today's tile width.
+const HEIGHTS = [[220, 160, 240], [150, 250, 200]].map((col) => col.map((h) => (h * TILE) / 168));
 
 export function Masonry({ photos, onPress }) {
   const cols = [[], []];
@@ -92,9 +93,9 @@ export const styles = StyleSheet.create({
   pillOn: { backgroundColor: COLORS.blue, borderColor: COLORS.paper },
   pillText: { fontSize: s(19) },
   fillImage: { width: '100%', height: '100%' },
-  tile: { width: s(168), backgroundColor: COLORS.tile, borderRadius: s(1), overflow: 'hidden' },
-  masonry: { flexDirection: 'row', gap: s(15), paddingHorizontal: s(21), paddingBottom: s(130), alignItems: 'flex-start' },
-  column: { gap: s(11) },
+  tile: { width: s(TILE), backgroundColor: COLORS.tile, borderRadius: s(1), overflow: 'hidden' },
+  masonry: { flexDirection: 'row', gap: s(GRID_GAP), paddingHorizontal: s(GRID_GUTTER), paddingBottom: s(130), alignItems: 'flex-start' },
+  column: { gap: s(GRID_GAP) },
   nav: { position: 'absolute', left: s(60), width: s(275), height: s(37), backgroundColor: 'rgba(0,0,0,0.73)', borderRadius: s(12), flexDirection: 'row' },
   navItem: { width: s(137.5), alignItems: 'flex-start', justifyContent: 'center' },
   navText: { fontSize: s(19) },
