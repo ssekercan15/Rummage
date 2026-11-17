@@ -12,7 +12,7 @@ import {
 } from '@expo-google-fonts/inria-serif';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BottomNav } from './src/components';
-import { byId, newFilters, seedCollections } from './src/library';
+import { byId, newFilters } from './src/library';
 import { buildForYou, clearProfile, emptyProfile, loadProfile, recordCategory, recordOpen, recordReason, recordSave, saveProfile } from './src/profile';
 import { Collection, Collections } from './src/screens/Archive';
 import Explore from './src/screens/Explore';
@@ -30,8 +30,8 @@ if (Platform.OS === 'ios') Image.configureCache({ maxDiskSize: 200 * 1024 * 1024
 function Rummage({ savedProfile, savedFolders }) {
   // Each entry is a screen: { name: 'explore' | 'archive' | 'photo' | 'collection', id?, index? }.
   const [stack, setStack] = useState([{ name: 'onboarding' }]);
-  // Folders come back from the device; the sample folders are only for the very first launch.
-  const [collections, setCollections] = useState(() => savedFolders ?? seedCollections());
+  // Folders come back from the device; a new user starts with an empty Archive.
+  const [collections, setCollections] = useState(() => savedFolders ?? []);
   useEffect(() => { saveFolders(collections); }, [collections]);
   const [profile, setProfile] = useState(savedProfile);
   // Worked out once per launch, so the grid doesn't reshuffle while someone is browsing.

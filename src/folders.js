@@ -2,9 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // The Archive's folders, kept on the device so they're still there next time the app opens.
 // (AsyncStorage is the phone's app storage; on the web it's the browser's local storage.)
-const KEY = 'rummage.folders.v1';
+// v2: started fresh when new users stopped getting sample folders, so none linger from v1.
+const KEY = 'rummage.folders.v2';
 
-// Saved folders, or null the first time (the app then starts with its sample folders).
+// Saved folders, or null the first time (the Archive then starts empty).
 export async function loadFolders() {
   try {
     const saved = JSON.parse(await AsyncStorage.getItem(KEY));

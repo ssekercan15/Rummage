@@ -35,9 +35,12 @@ export function Collections({ collections, onOpen, onNew }) {
         <T style={styles.pageTitle}>Archive</T>
         <PillButton label="+ New" onPress={onNew} accessibilityLabel="New collection" />
       </View>
-      <T style={styles.summary}>{collections.length} collections · {total} images</T>
+      <T style={styles.summary}>{collections.length} collection{collections.length === 1 ? '' : 's'} · {plural(total)}</T>
       <ScrollView style={styles.cardScroll} contentContainerStyle={styles.cards} showsVerticalScrollIndicator={false}>
         {collections.map((c, i) => <Card key={c.name} collection={c} onPress={() => onOpen(i)} />)}
+        {collections.length === 0 && (
+          <T style={styles.empty}>No folders yet. Tap + New, or Save on any photo, to start one.</T>
+        )}
       </ScrollView>
     </View>
   );
@@ -146,6 +149,7 @@ const styles = StyleSheet.create({
   coverSmall: { width: s(55), height: s(83) },
   cardName: { marginTop: s(8), fontSize: s(18), lineHeight: s(22) },
   count: { fontSize: s(13), color: COLORS.muted },
+  empty: { width: s(351), paddingTop: s(24), fontSize: s(17), lineHeight: s(23), color: COLORS.muted },
   bar: { position: 'absolute', left: s(21), right: s(21), top: s(59), height: s(38), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   back: { width: s(38), height: s(38), marginLeft: -s(7), alignItems: 'center', justifyContent: 'center' },
   // Scrolls under the top bar (behind a fade) rather than stopping below it
