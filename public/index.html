@@ -32,7 +32,19 @@
         height: 100%;
         flex: 1;
       }
+      /* Opened from the home screen, iOS sizes "100%" as if the status bar still took space,
+         leaving a black band at the bottom. There, 100vh is the whole screen, so the photos
+         run off the bottom edge like in the native app. (Safari tabs keep 100%.) */
+      html.standalone,
+      html.standalone body {
+        height: 100vh;
+      }
     </style>
+    <script>
+      if (window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) {
+        document.documentElement.classList.add('standalone');
+      }
+    </script>
   </head>
 
   <body>
