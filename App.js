@@ -21,15 +21,18 @@ import Photo from './src/screens/Photo';
 import ProfileSheet from './src/screens/ProfileSheet';
 import SaveSheet from './src/screens/SaveSheet';
 import SwipeBack from './src/swipeBack';
+import { loadFolders, saveFolders } from './src/folders';
 import { WEB_MAX_WIDTH } from './src/theme';
 
 // Keep at most ~200 MB of viewed photos on the phone; the least recently seen go first.
 if (Platform.OS === 'ios') Image.configureCache({ maxDiskSize: 200 * 1024 * 1024 });
 
-function Rummage({ savedProfile }) {
+function Rummage({ savedProfile, savedFolders }) {
   // Each entry is a screen: { name: 'explore' | 'archive' | 'photo' | 'collection', id?, index? }.
   const [stack, setStack] = useState([{ name: 'onboarding' }]);
-  const [collections, setCollections] = useState(seedCollections);
+  // Folders come back from the device; the sample folders are only for the very first launch.
+  const [collections, setCollections] = useState(() => savedFolders ?? seedCollections());
+  useEffect(() => { saveFolders(collections); }, [collections]);
   const [profile, setProfile] = useState(savedProfile);
   // Worked out once per launch, so the grid doesn't reshuffle while someone is browsing.
   const launchFeed = useMemo(() => buildForYou(savedProfile), [savedProfile]);
@@ -163,8 +166,11 @@ function Rummage({ savedProfile }) {
 }
 
 export default function App() {
-  const [savedProfile, setSavedProfile] = useState(null);
-  useEffect(() => { loadProfile().then(setSavedProfile); }, []);
+  // Topics and folders are read from the device before the app first draws.
+  const [saved, setSaved] = useState(null);
+  useEffect(() => {
+    Promise.all([loadProfile(), loadFolders()]).then(([profile, folders]) => setSaved({ profile, folders }));
+  }, []);
   const [fontsLoaded] = useFonts({
     InriaSans_400Regular,
     InriaSerif_400Regular,
@@ -179,7 +185,7 @@ export default function App() {
       <View style={styles.backdrop}>
         <View style={[styles.app, Platform.OS === 'web' && styles.webColumn]}>
           <StatusBar style="light" />
-          {fontsLoaded && savedProfile && <Rummage savedProfile={savedProfile} />}
+          {fontsLoaded && saved && <Rummage savedProfile={saved.profile} savedFolders={saved.folders} />}
         </View>
       </View>
     </SafeAreaProvider>
