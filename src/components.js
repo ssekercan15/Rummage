@@ -1,9 +1,9 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
-import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { MARK_OVER, MARK_UNDER } from './data/icons';
 import { imageFor } from './library';
-import { COLORS, GRID_GAP, GRID_GUTTER, s, T, TILE, useFit } from './theme';
+import { COLORS, FONTS, GRID_GAP, GRID_GUTTER, s, T, TILE, useFit } from './theme';
 
 function Gradients() {
   return (
@@ -48,10 +48,24 @@ export function PillButton({ label, on, onPress, style, accessibilityLabel }) {
   );
 }
 
-export function PhotoTile({ photo, height, onPress }) {
+// The round "+" from the Figma folder page: a 35pt white ring with a bold Inria Serif plus.
+function AddButton({ onPress, label }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={s(8)} style={styles.add}>
+      <Svg width={s(35)} height={s(35)} viewBox="0 0 35 35" fill="none" style={StyleSheet.absoluteFill}>
+        <Circle cx="17.5" cy="17.5" r="16.5" strokeWidth={2} stroke="#fff" />
+      </Svg>
+      <T style={styles.addPlus}>+</T>
+    </Pressable>
+  );
+}
+
+// onAdd (optional) shows the "+" in the corner, for adding a suggestion to a folder.
+export function PhotoTile({ photo, height, onPress, onAdd }) {
   return (
     <Pressable onPress={() => onPress(photo.id)} accessibilityRole="imagebutton" accessibilityLabel={photo.title} style={[styles.tile, { height: s(height) }]}>
       <Image source={imageFor(photo)} style={styles.fillImage} contentFit="cover" recyclingKey={photo.id} transition={150} />
+      {onAdd && <AddButton onPress={() => onAdd(photo.id)} label={`Add ${photo.title} to this folder`} />}
     </Pressable>
   );
 }
@@ -59,14 +73,14 @@ export function PhotoTile({ photo, height, onPress }) {
 // Masonry heights from the Figma frames (drawn for 168pt-wide tiles), scaled to today's tile width.
 const HEIGHTS = [[220, 160, 240], [150, 250, 200]].map((col) => col.map((h) => (h * TILE) / 168));
 
-export function Masonry({ photos, onPress }) {
+export function Masonry({ photos, onPress, onAdd, style }) {
   const cols = [[], []];
   photos.forEach((p, i) => cols[i % 2].push(p));
   return (
-    <View style={styles.masonry}>
+    <View style={[styles.masonry, style]}>
       {cols.map((col, c) => (
         <View key={c} style={styles.column}>
-          {col.map((p, i) => <PhotoTile key={p.id} photo={p} height={HEIGHTS[c][i % 3]} onPress={onPress} />)}
+          {col.map((p, i) => <PhotoTile key={p.id} photo={p} height={HEIGHTS[c][i % 3]} onPress={onPress} onAdd={onAdd} />)}
         </View>
       ))}
     </View>
@@ -96,6 +110,8 @@ export const styles = StyleSheet.create({
   tile: { width: s(TILE), backgroundColor: COLORS.tile, borderRadius: s(1), overflow: 'hidden' },
   masonry: { flexDirection: 'row', gap: s(GRID_GAP), paddingHorizontal: s(GRID_GUTTER), paddingBottom: s(130), alignItems: 'flex-start' },
   column: { gap: s(GRID_GAP) },
+  add: { position: 'absolute', right: s(7), bottom: s(8), width: s(35), height: s(35), alignItems: 'center', justifyContent: 'center' },
+  addPlus: { fontFamily: FONTS.serifBold, fontSize: s(40), lineHeight: s(40), marginTop: -s(3), color: COLORS.paper },
   nav: { position: 'absolute', left: s(60), width: s(275), height: s(37), backgroundColor: 'rgba(0,0,0,0.73)', borderRadius: s(12), flexDirection: 'row' },
   navItem: { width: s(137.5), alignItems: 'flex-start', justifyContent: 'center' },
   navText: { fontSize: s(19) },

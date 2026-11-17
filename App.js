@@ -140,7 +140,7 @@ function Rummage({ savedProfile }) {
             <Collections collections={collections} onOpen={(index) => push({ name: 'collection', index })} onNew={() => setSheet({ photoId: null })} />
           )}
           {entry.name === 'collection' && (
-            <Collection collection={collections[entry.index]} onBack={goBack} onOpenPhoto={openPhoto} />
+            <Collection collection={collections[entry.index]} onBack={goBack} onOpenPhoto={openPhoto} onAdd={(id) => toggleSaved(entry.index, id)} />
           )}
           {entry.name === 'photo' && (
             <Photo photo={byId.get(entry.id)} saved={collections.some((c) => c.photos.includes(entry.id))} onBack={goBack} onSave={() => setSheet({ photoId: entry.id })} onOpenPhoto={openPhoto} onSearch={searchFor} />

@@ -214,3 +214,21 @@ export function sameTimePeriod(photo) {
     .sort((a, b) => a[0] - b[0] || a[1] - b[1])
     .map(([, , o]) => o);
 }
+
+// "Keep Rummaging" on a folder: photos like the ones already in it. Each of the folder's
+// most recent photos votes for its closest Similar Subject matches (closer = more votes),
+// and anything already in the folder is left out. An empty folder gets the home mix.
+const SUGGEST_FROM = 6; // recent photos considered (each costs one Similar Subject pass)
+const SUGGEST_DEPTH = 30; // matches taken from each
+export function suggestionsFor(photoIds, count = 24) {
+  const inFolder = new Set(photoIds);
+  const seeds = photoIds.map((id) => byId.get(id)).filter(Boolean).slice(0, SUGGEST_FROM);
+  if (!seeds.length) return LIB.filter((p) => !p.hideFromExplore).slice(0, count);
+  const votes = new Map();
+  seeds.forEach((seed) => {
+    similarSubject(seed).slice(0, SUGGEST_DEPTH).forEach((o, rank) => {
+      if (!inFolder.has(o.id)) votes.set(o.id, (votes.get(o.id) || 0) + (SUGGEST_DEPTH - rank));
+    });
+  });
+  return [...votes].sort((a, b) => b[1] - a[1]).slice(0, count).map(([id]) => byId.get(id));
+}
