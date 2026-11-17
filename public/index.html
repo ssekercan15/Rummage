@@ -22,6 +22,9 @@
         height: 100%;
         background-color: #000; /* no white flash or strip around the app */
       }
+      /* No scroll bars anywhere: lists still scroll, the photos just run to the edges */
+      * { scrollbar-width: none; }
+      *::-webkit-scrollbar { display: none; }
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;

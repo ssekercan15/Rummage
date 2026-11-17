@@ -28,7 +28,7 @@ export default function SaveSheet({ photoId, collections, onToggle, onCreate, on
           <Pressable onPress={close} accessibilityRole="button"><T style={styles.cancel}>Cancel</T></Pressable>
         </View>
         {photoId !== null && (
-          <ScrollView style={styles.rows} keyboardShouldPersistTaps="handled" {...scrollProps}>
+          <ScrollView style={styles.rows} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} {...scrollProps}>
             {collections.map((c, i) => {
               const saved = c.photos.includes(photoId);
               const thumb = byId.get(c.photos[0]);

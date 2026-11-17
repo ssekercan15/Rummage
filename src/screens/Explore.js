@@ -272,6 +272,7 @@ export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, 
   return (
     <View style={[styles.root, { top: 0 - s(homeShift) }]}>
       <FlatList
+        showsVerticalScrollIndicator={false}
         ref={listRef}
         style={styles.list}
         data={shown.slice(0, count)}
