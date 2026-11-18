@@ -1,11 +1,19 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, PanResponder, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Animated, Image, PanResponder, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { Mark, PhotoTile } from '../components';
 import { CATEGORIES, colorAt, shade, FULL_RANGE, MAX_YEAR, MIN_YEAR, results, searchIsRelated, spectrumImage } from '../library';
 import { COLORS, FONTS, GRID_GAP, GRID_GUTTER, s, T, TILE, useFit } from '../theme';
 
 const BATCH = 14;
+// Collapsing header: the first RISE pt of scrolling folds the logo row away. The search bar
+// and chips rise by RISE, the profile button drops into the search row, and the search bar
+// shortens from the right to make room. The grid scrolls the same distance, so it stays
+// attached to the header the whole way.
+const RISE = 36;
+const SEARCH_W = 338;
+const SEARCH_SHORT = SEARCH_W - 31 - 10; // profile icon width + a gap
+const PROFILE_DROP = 119 - RISE + (39 - 33) / 2 - 71; // from its own row to centered in the search row
 const PICKER_WIDTH = 302;
 const PICKER_HEIGHT = 201;
 const KNOB = 27;
@@ -215,6 +223,16 @@ export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, 
   const [rangeDraft, setRangeDraft] = useState(FULL_RANGE);
   const [count, setCount] = useState(BATCH);
   const listRef = useRef(null);
+  // How far the header has folded (0 open, 1 folded), following the grid's scroll.
+  const [scrollY] = useState(() => new Animated.Value(0));
+  const collapse = useMemo(() => scrollY.interpolate({ inputRange: [0, RISE], outputRange: [0, 1], extrapolate: 'clamp' }), [scrollY]);
+  const rise = useMemo(() => collapse.interpolate({ inputRange: [0, 1], outputRange: [0, -s(RISE)] }), [collapse]);
+  // Once the logo has faded, it stops taking taps.
+  const [logoHidden, setLogoHidden] = useState(false);
+  useEffect(() => {
+    const id = scrollY.addListener(({ value }) => setLogoHidden(value > RISE * 0.5));
+    return () => scrollY.removeListener(id);
+  }, [scrollY]);
   const placeholder = usePrompts(promptsOn);
 
   const deferred = useDeferredValue(filters);
@@ -271,8 +289,11 @@ export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, 
 
   return (
     <View style={[styles.root, { top: 0 - s(homeShift) }]}>
-      <FlatList
+      <Animated.FlatList
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        // JS-driven: the search bar's width and the header's height can't run on the native driver
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
         ref={listRef}
         style={styles.list}
         data={shown.slice(0, count)}
@@ -290,21 +311,38 @@ export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, 
         keyboardShouldPersistTaps="handled"
       />
 
-      <View style={styles.head} pointerEvents="none" />
-      {/* The logo takes you home: filters and search cleared, back to the top */}
-      <Pressable onPress={() => { setPanel(null); onHome(); }} accessibilityRole="button" accessibilityLabel="Rummage home" hitSlop={s(8)} style={styles.brand}>
-        <Mark width={s(35)} height={s(28)} />
-        <T style={styles.brandText}>Rummage</T>
-      </Pressable>
-      <Pressable onPress={onOpenProfile} accessibilityRole="button" accessibilityLabel="Your topics" hitSlop={s(8)} style={styles.profile}>
-        <ProfileIcon />
-      </Pressable>
+      <Animated.View style={[styles.head, { height: collapse.interpolate({ inputRange: [0, 1], outputRange: [s(217), s(217 - RISE)] }) }]} pointerEvents="none" />
+      {/* The logo takes you home: filters and search cleared, back to the top. It rises and fades as the header folds. */}
+      <Animated.View
+        pointerEvents={logoHidden ? 'none' : 'auto'}
+        style={[styles.brand, {
+          opacity: collapse.interpolate({ inputRange: [0, 0.6], outputRange: [1, 0], extrapolate: 'clamp' }),
+          transform: [{ translateY: collapse.interpolate({ inputRange: [0, 1], outputRange: [0, -s(RISE + 8)] }) }],
+        }]}
+      >
+        <Pressable onPress={() => { setPanel(null); onHome(); }} accessibilityRole="button" accessibilityLabel="Rummage home" hitSlop={s(8)} style={styles.brandRow}>
+          <Mark width={s(35)} height={s(28)} />
+          <T style={styles.brandText}>Rummage</T>
+        </Pressable>
+      </Animated.View>
+      <Animated.View style={[styles.profile, { transform: [{ translateY: collapse.interpolate({ inputRange: [0, 1], outputRange: [0, s(PROFILE_DROP)] }) }] }]}>
+        <Pressable onPress={onOpenProfile} accessibilityRole="button" accessibilityLabel="Your topics" hitSlop={s(8)}>
+          <ProfileIcon />
+        </Pressable>
+      </Animated.View>
 
       {panel && <Pressable style={styles.scrim} onPress={() => setPanel(null)} accessibilityLabel="Close filters" />}
-      {panel === 'time' && <TimePanel range={rangeDraft} setRange={setRangeDraft} onApply={applyRange} />}
-      {panel === 'color' && <ColorPanel draft={colorDraft} setDraft={setColorDraft} onApply={applyColor} />}
+      {panel && (
+        <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { transform: [{ translateY: rise }] }]}>
+          {panel === 'time' && <TimePanel range={rangeDraft} setRange={setRangeDraft} onApply={applyRange} />}
+          {panel === 'color' && <ColorPanel draft={colorDraft} setDraft={setColorDraft} onApply={applyColor} />}
+        </Animated.View>
+      )}
 
-      <View style={styles.searchBox}>
+      <Animated.View style={[styles.searchBox, {
+        width: collapse.interpolate({ inputRange: [0, 1], outputRange: [s(SEARCH_W), s(SEARCH_SHORT)] }),
+        transform: [{ translateY: rise }],
+      }]}>
         <TextInput
           style={styles.input}
           value={filters.q}
@@ -317,35 +355,37 @@ export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, 
           allowFontScaling={false}
           accessibilityLabel="Search the archives"
         />
-      </View>
+      </Animated.View>
 
-      <ScrollView
+      <Animated.ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.chips}
+        style={[styles.chips, { transform: [{ translateY: rise }] }]}
         contentContainerStyle={styles.chipsContent}
         keyboardShouldPersistTaps="handled"
       >
         {orderedChips.map(({ key, on, ...chip }) => <Chip key={key} {...chip} />)}
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: COLORS.ink },
-  list: { position: 'absolute', left: 0, right: 0, top: s(217), bottom: 0 },
+  // The grid runs the full height and starts below the header, so it can scroll up under it
+  list: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
   row: { gap: s(GRID_GAP), marginBottom: s(GRID_GAP) },
-  gridContent: { paddingHorizontal: s(GRID_GUTTER), paddingBottom: s(130) },
+  gridContent: { paddingTop: s(217), paddingHorizontal: s(GRID_GUTTER), paddingBottom: s(130) },
   empty: { paddingVertical: s(90), paddingHorizontal: s(24), textAlign: 'center', fontSize: s(19), lineHeight: s(26) },
   related: { fontSize: s(15), color: COLORS.muted, paddingBottom: s(10) },
   more: { textAlign: 'center', fontSize: s(15), color: COLORS.muted, paddingTop: s(8) },
   head: { position: 'absolute', left: 0, right: 0, top: 0, height: s(217), backgroundColor: COLORS.ink },
-  brand: { position: 'absolute', left: s(29), top: s(73), flexDirection: 'row', alignItems: 'center', gap: s(13) },
+  brand: { position: 'absolute', left: s(29), top: s(73) },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: s(13) },
   brandText: { fontSize: s(32), lineHeight: s(36), fontFamily: FONTS.serifBold },
   profile: { position: 'absolute', left: s(337), top: s(71) },
   scrim: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
-  searchBox: { position: 'absolute', left: s(29), top: s(119), width: s(338), height: s(39), borderWidth: 0.5, borderColor: COLORS.paper, borderRadius: s(31), paddingLeft: s(22), paddingRight: s(4), justifyContent: 'center', backgroundColor: COLORS.ink },
+  searchBox: { position: 'absolute', left: s(29), top: s(119), height: s(39), borderWidth: 0.5, borderColor: COLORS.paper, borderRadius: s(31), paddingLeft: s(22), paddingRight: s(4), justifyContent: 'center', backgroundColor: COLORS.ink },
   input: { fontFamily: FONTS.serif, fontSize: s(17), color: COLORS.soft, padding: 0 },
   chips: { position: 'absolute', left: 0, right: 0, top: s(168), height: s(39) },
   chipsContent: { paddingHorizontal: s(30), gap: s(7) },
