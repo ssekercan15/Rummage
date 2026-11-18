@@ -1,12 +1,18 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Image, PanResponder, Platform, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import { Image as ExpoImage } from 'expo-image';
 import { Mark, PhotoTile } from '../components';
-import { CATEGORIES, colorAt, shade, FULL_RANGE, MAX_YEAR, MIN_YEAR, results, searchIsRelated, spectrumImage } from '../library';
+import { CATEGORIES, colorAt, imageFor, shade, FULL_RANGE, MAX_YEAR, MIN_YEAR, results, searchIsRelated, spectrumImage } from '../library';
 import { glide, NATIVE } from '../motion';
 import { COLORS, FONTS, GRID_GAP, GRID_GUTTER, s, T, TILE, useFit } from '../theme';
 
-const BATCH = 14;
+// Infinite grid: start with BATCH photos and add BATCH more whenever the end is within
+// AHEAD screens, so a fast flick doesn't run out. The next PREFETCH photos past the end are
+// downloaded in advance, so they're already there when they scroll into view.
+const BATCH = 36;
+const AHEAD = 3;
+const PREFETCH = 24;
 // Pull to refresh: pull the grid down past PULL_AT and let go for a fresh mix. While it
 // loads, the grid rests HOLD lower with the logo spinning in the gap.
 const PULL_AT = 70;
@@ -311,6 +317,11 @@ export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, 
 
   const deferred = useDeferredValue(filters);
   const shown = useMemo(() => results(deferred), [deferred]);
+  // Download the photos just past the end of the grid before they're needed.
+  useEffect(() => {
+    const next = shown.slice(count, count + PREFETCH).map((p) => imageFor(p)?.uri).filter(Boolean);
+    if (next.length) ExpoImage.prefetch(next).catch(() => {});
+  }, [shown, count]);
   const related = useMemo(() => searchIsRelated(deferred), [deferred]);
   useEffect(() => {
     setCount(BATCH);
@@ -379,10 +390,12 @@ export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, 
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.gridContent}
-        initialNumToRender={8}
+        initialNumToRender={12}
+        maxToRenderPerBatch={16}
+        windowSize={15}
         renderItem={({ item }) => <PhotoTile photo={item} height={TILE} onPress={onOpenPhoto} />}
         onEndReached={() => setCount((c) => Math.min(c + BATCH, shown.length))}
-        onEndReachedThreshold={1.2}
+        onEndReachedThreshold={AHEAD}
         ListHeaderComponent={related && shown.length ? <T style={styles.related}>No exact matches for “{deferred.q.trim()}”. Showing related images.</T> : null}
         ListEmptyComponent={<T style={styles.empty}>{deferred.q.trim() ? `Nothing like “${deferred.q.trim()}” in the archive yet. Try another word.` : 'Nothing in this sample matches. Try another year or filter.'}</T>}
         ListFooterComponent={more ? <T style={styles.more}>Rummaging around…</T> : null}
