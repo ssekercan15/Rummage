@@ -232,3 +232,27 @@ export function suggestionsFor(photoIds, count = 24) {
   });
   return [...votes].sort((a, b) => b[1] - a[1]).slice(0, count).map(([id]) => byId.get(id));
 }
+
+// A fresh home mix for pull-to-refresh when there isn't enough history for a personal one:
+// photos that suit the reason picked at onboarding come up three times as often as the rest,
+// both shuffled, so each refresh deals a new spread.
+export function shuffledMix(reason, random = Math.random) {
+  const shuffle = (list) => {
+    const a = list.slice();
+    for (let i = a.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  const pool = LIB.filter((p) => !p.hideFromExplore);
+  const rule = REASON_RULES[reason];
+  const suited = shuffle(rule ? pool.filter(rule.match) : pool);
+  const rest = shuffle(rule ? pool.filter((p) => !rule.match(p)) : []);
+  const order = [];
+  while (suited.length || rest.length) {
+    for (let k = 0; k < 3 && suited.length; k += 1) order.push(suited.pop().id);
+    if (rest.length) order.push(rest.pop().id);
+  }
+  return order;
+}

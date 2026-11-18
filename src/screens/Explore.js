@@ -1,11 +1,17 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, PanResponder, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Animated, Easing, Image, PanResponder, Platform, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { Mark, PhotoTile } from '../components';
 import { CATEGORIES, colorAt, shade, FULL_RANGE, MAX_YEAR, MIN_YEAR, results, searchIsRelated, spectrumImage } from '../library';
+import { glide, NATIVE } from '../motion';
 import { COLORS, FONTS, GRID_GAP, GRID_GUTTER, s, T, TILE, useFit } from '../theme';
 
 const BATCH = 14;
+// Pull to refresh: pull the grid down past PULL_AT and let go for a fresh mix. While it
+// loads, the grid rests HOLD lower with the logo spinning in the gap.
+const PULL_AT = 70;
+const HOLD = 52;
+const REFRESH_MS = 650;
 // Collapsing header: the first RISE pt of scrolling folds the logo row away. The search bar
 // and chips rise by RISE, the profile button drops into the search row, and the search bar
 // shortens from the right to make room. The grid scrolls the same distance, so it stays
@@ -216,7 +222,7 @@ function ColorPanel({ draft, setDraft, onApply }) {
   );
 }
 
-export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, onOpenPhoto, onPickCategory, onOpenProfile, onHome }) {
+export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, onOpenPhoto, onPickCategory, onOpenProfile, onHome, onRefresh }) {
   const { homeShift } = useFit();
   const [panel, setPanel] = useState(null); // 'color' | 'time' | null
   const [colorDraft, setColorDraft] = useState(null);
@@ -234,6 +240,74 @@ export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, 
     return () => scrollY.removeListener(id);
   }, [scrollY]);
   const placeholder = usePrompts(promptsOn);
+
+  // --- Pull to refresh ---------------------------------------------------------------
+  // `pull` is how far the grid is pulled down (pt). On iPhone it's the list's own stretch past
+  // the top; on the web the browser doesn't give that, so touches move the grid directly.
+  const [pull] = useState(() => new Animated.Value(0));
+  const [spin] = useState(() => new Animated.Value(0));
+  const [refreshing, setRefreshing] = useState(false);
+  const busy = useRef(false);
+  const refresh = () => {
+    if (busy.current) return;
+    busy.current = true;
+    setRefreshing(true);
+    const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: NATIVE }));
+    loop.start();
+    if (Platform.OS === 'web') Animated.spring(pull, { toValue: s(HOLD), ...glide(0), useNativeDriver: false }).start();
+    onRefresh();
+    setTimeout(() => {
+      loop.stop();
+      spin.setValue(0);
+      Animated.spring(pull, { toValue: 0, ...glide(0), useNativeDriver: false }).start();
+      setRefreshing(false);
+      busy.current = false;
+    }, REFRESH_MS);
+  };
+  const refreshRef = useRef(refresh);
+  useEffect(() => { refreshRef.current = refresh; });
+  // iPhone: the list stretches past its top (negative scroll); that stretch drives the logo.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return undefined;
+    // (keeps following while refreshing, so the logo rides back up with the grid)
+    const id = scrollY.addListener(({ value }) => pull.setValue(Math.max(0, -value)));
+    return () => scrollY.removeListener(id);
+  }, [scrollY, pull]);
+  // Web (including the home-screen app): follow the finger while the grid is at its top.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return undefined;
+    const node = listRef.current?.getScrollableNode?.();
+    if (!node) return undefined;
+    let startY = null;
+    let dist = 0;
+    const onStart = (e) => { startY = node.scrollTop <= 0 && !busy.current ? e.touches[0].clientY : null; dist = 0; };
+    const onMove = (e) => {
+      if (startY === null) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy <= 0 || node.scrollTop > 0) { if (dist) pull.setValue(0); dist = 0; return; }
+      e.preventDefault(); // stop the page from scrolling while pulling
+      dist = dy * 0.55; // a little resistance, like a stretch
+      pull.setValue(dist);
+    };
+    const onEnd = () => {
+      if (startY === null) return;
+      startY = null;
+      if (dist > s(PULL_AT)) refreshRef.current();
+      else Animated.spring(pull, { toValue: 0, ...glide(0), useNativeDriver: false }).start();
+      dist = 0;
+    };
+    node.addEventListener('touchstart', onStart, { passive: true });
+    node.addEventListener('touchmove', onMove, { passive: false });
+    node.addEventListener('touchend', onEnd);
+    node.addEventListener('touchcancel', onEnd);
+    return () => {
+      node.removeEventListener('touchstart', onStart);
+      node.removeEventListener('touchmove', onMove);
+      node.removeEventListener('touchend', onEnd);
+      node.removeEventListener('touchcancel', onEnd);
+    };
+  }, [pull]);
+  const pullShown = pull.interpolate({ inputRange: [0, s(PULL_AT)], outputRange: [0, 1], extrapolate: 'clamp' });
 
   const deferred = useDeferredValue(filters);
   const shown = useMemo(() => results(deferred), [deferred]);
@@ -294,8 +368,12 @@ export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, 
         scrollEventThrottle={16}
         // JS-driven: the search bar's width and the header's height can't run on the native driver
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+        // iPhone: let go while stretched past the top to refresh
+        onScrollEndDrag={(e) => { if (Platform.OS === 'ios' && e.nativeEvent.contentOffset.y < -s(PULL_AT)) refresh(); }}
+        // Android has no stretch, so it uses the system's pull to refresh
+        refreshControl={Platform.OS === 'android' ? <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={COLORS.paper} colors={[COLORS.blue]} progressViewOffset={s(217)} /> : undefined}
         ref={listRef}
-        style={styles.list}
+        style={[styles.list, Platform.OS === 'web' && { transform: [{ translateY: pull }] }]}
         data={shown.slice(0, count)}
         keyExtractor={(p) => p.id}
         numColumns={2}
@@ -311,6 +389,23 @@ export default function Explore({ filters, setFilters, promptsOn, setPromptsOn, 
         keyboardShouldPersistTaps="handled"
       />
 
+      {/* Pull-to-refresh indicator: the logo, in the gap that opens above the photos */}
+      {Platform.OS !== 'android' && (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.pullMark, {
+            opacity: refreshing ? 1 : pullShown,
+            transform: [
+              { translateY: Animated.multiply(pull, 0.5) },
+              { scale: pullShown.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) },
+              // sweeps round with the pull, then spins while the new mix loads
+              { rotate: refreshing ? spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) : pullShown.interpolate({ inputRange: [0, 1], outputRange: ['-90deg', '0deg'] }) },
+            ],
+          }]}
+        >
+          <Mark width={s(30)} height={s(24)} />
+        </Animated.View>
+      )}
       <Animated.View style={[styles.head, { height: collapse.interpolate({ inputRange: [0, 1], outputRange: [s(217), s(217 - RISE)] }) }]} pointerEvents="none" />
       {/* The logo takes you home: filters and search cleared, back to the top. It rises and fades as the header folds. */}
       <Animated.View
@@ -381,6 +476,7 @@ const styles = StyleSheet.create({
   more: { textAlign: 'center', fontSize: s(15), color: COLORS.muted, paddingTop: s(8) },
   head: { position: 'absolute', left: 0, right: 0, top: 0, height: s(217), backgroundColor: COLORS.ink },
   brand: { position: 'absolute', left: s(29), top: s(73) },
+  pullMark: { position: 'absolute', top: s(217 - 12), left: 0, right: 0, alignItems: 'center' },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: s(13) },
   brandText: { fontSize: s(32), lineHeight: s(36), fontFamily: FONTS.serifBold },
   profile: { position: 'absolute', left: s(337), top: s(71) },

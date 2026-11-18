@@ -12,7 +12,7 @@ import {
 } from '@expo-google-fonts/inria-serif';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BottomNav } from './src/components';
-import { byId, newFilters } from './src/library';
+import { byId, newFilters, shuffledMix } from './src/library';
 import { buildForYou, clearProfile, emptyProfile, loadProfile, recordCategory, recordOpen, recordReason, recordSave, saveProfile } from './src/profile';
 import { Collection, Collections } from './src/screens/Archive';
 import Explore from './src/screens/Explore';
@@ -70,6 +70,13 @@ function Rummage({ savedProfile, savedFolders }) {
   };
 
   // Back to the home mix: no search or filters, the recommended order.
+  // Pull to refresh on the home grid: deal a new mix (personal when there's enough history).
+  const refreshHome = () => {
+    const next = buildForYou(profile) ?? shuffledMix(filters.reason);
+    setFeed(next);
+    setFilters((f) => ({ ...f, feed: next }));
+  };
+
   const goHome = () => {
     setFilters(newFilters(filters.reason, feed));
     setPromptsOn(true);
@@ -134,7 +141,7 @@ function Rummage({ savedProfile, savedFolders }) {
     <View style={styles.app}>
       {/* Screens stay mounted under the top one, so going back keeps your scroll position. */}
       <View style={StyleSheet.absoluteFill} pointerEvents={screen.name === 'explore' ? 'auto' : 'none'}>
-        <Explore filters={filters} setFilters={setFilters} promptsOn={promptsOn} setPromptsOn={setPromptsOn} onOpenPhoto={openPhoto} onPickCategory={(label) => updateProfile((p) => recordCategory(p, label))} onOpenProfile={() => setProfileOpen(true)} onHome={goHome} />
+        <Explore filters={filters} setFilters={setFilters} promptsOn={promptsOn} setPromptsOn={setPromptsOn} onOpenPhoto={openPhoto} onPickCategory={(label) => updateProfile((p) => recordCategory(p, label))} onOpenProfile={() => setProfileOpen(true)} onHome={goHome} onRefresh={refreshHome} />
       </View>
       {stack.map((entry, depth) => entry.name !== 'explore' && (
         // Any screen opened on top of another can be swiped right to go back.
